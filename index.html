@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameMatch IA — Recomendador de Jogos de Tabuleiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --felt: #1B3A2E;
+    --felt-light: #28503F;
+    --parchment: #F4ECD9;
+    --card: #FBF6EA;
+    --wood: #8B5E34;
+    --terracotta: #C2542A;
+    --gold: #D1A23C;
+    --ink: #201A12;
+    --ink-soft: #5B5240;
+    --line: rgba(32,26,18,0.12);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--felt);
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(255,255,255,0.04), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(255,255,255,0.03), transparent 40%);
+    color:var(--ink);
+    font-family:'Karla', sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:36px 20px 80px;}
+
+  /* HERO */
+  .hero{ display:flex; align-items:center; gap:28px; padding:18px 4px 36px; }
+  .die{ flex:0 0 auto; }
+  .hero h1{
+    font-family:'Fraunces', serif; font-weight:700; font-size:42px; line-height:1.05;
+    color:var(--parchment); margin:0 0 8px;
+  }
+  .hero p{ color:rgba(244,236,217,0.72); margin:0; font-size:15px; max-width:480px; line-height:1.5;}
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--gold); margin-bottom:10px; display:block;
+  }
+
+  /* CARD PANEL */
+  .panel{
+    background:var(--card); border-radius:18px; padding:28px;
+    box-shadow:0 24px 50px rgba(0,0,0,0.28);
+    border:1px solid rgba(255,255,255,0.4);
+  }
+  .panel + .panel{ margin-top:22px; }
+  .panel h2{
+    font-family:'Fraunces', serif; font-size:20px; font-weight:600; margin:0 0 18px;
+    color:var(--ink); display:flex; align-items:center; gap:10px;
+  }
+  .panel h2 .num{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--card);
+    background:var(--terracotta); width:22px; height:22px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media(max-width:600px){ .grid2{ grid-template-columns:1fr; } .hero{flex-direction:column; align-items:flex-start; text-align:left;} }
+
+  label.field{ display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em;}
+  input[type=number], select{
+    width:100%; padding:10px 12px; border-radius:9px; border:1.5px solid var(--line);
+    background:#fff; font-family:'Karla'; font-size:14.5px; color:var(--ink);
+  }
+  input[type=range]{ width:100%; accent-color:var(--terracotta); }
+  .slider-row{ display:flex; align-items:center; gap:10px; }
+  .slider-val{ font-family:'JetBrains Mono', monospace; font-size:13px; background:var(--felt); color:var(--parchment); padding:3px 9px; border-radius:6px; min-width:34px; text-align:center;}
+
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .chip{
+    padding:7px 13px; border-radius:999px; border:1.5px solid var(--line); background:#fff;
+    font-size:13px; cursor:pointer; user-select:none; transition:all .15s ease; color:var(--ink-soft);
+  }
+  .chip:hover{ border-color:var(--terracotta); }
+  .chip.active{ background:var(--felt); border-color:var(--felt); color:var(--parchment); }
+
+  .row-buttons{ display:flex; gap:12px; margin-top:22px; flex-wrap:wrap; }
+  button.primary{
+    background:var(--terracotta); color:#fff; border:none; padding:13px 22px; border-radius:10px;
+    font-family:'Karla'; font-weight:700; font-size:14.5px; cursor:pointer; letter-spacing:0.01em;
+    box-shadow:0 8px 18px rgba(194,84,42,0.35); transition:transform .12s ease;
+  }
+  button.primary:hover{ transform:translateY(-1px); }
+  button.ghost{
+    background:transparent; border:1.5px solid var(--line); color:var(--ink-soft);
+    padding:13px 18px; border-radius:10px; font-family:'Karla'; font-weight:600; font-size:13.5px; cursor:pointer;
+  }
+  button.ghost:hover{ border-color:var(--ink-soft); }
+
+  .badge{ font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--ink-soft); background:rgba(32,26,18,0.06); padding:3px 8px; border-radius:6px;}
+
+  /* RESULTS */
+  .result-meta{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px;}
+  .result-meta span{ font-size:12.5px; color:var(--ink-soft); }
+  .game-card{
+    border:1.5px solid var(--line); border-radius:14px; padding:18px 20px; margin-bottom:14px;
+    background:#fff; position:relative; overflow:hidden;
+  }
+  .game-card::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--gold);
+  }
+  .game-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
+  .game-title{ font-family:'Fraunces', serif; font-size:19px; font-weight:600; margin:0 0 4px;}
+  .game-sub{ font-size:12.5px; color:var(--ink-soft); }
+  .score{
+    font-family:'JetBrains Mono', monospace; font-weight:600; font-size:20px; color:var(--terracotta);
+    text-align:right; white-space:nowrap;
+  }
+  .score small{ display:block; font-size:10px; color:var(--ink-soft); font-weight:500; text-transform:uppercase;}
+  .explain{
+    margin-top:10px; padding:10px 13px; background:rgba(209,162,60,0.12); border-radius:9px;
+    font-size:13.5px; line-height:1.5; color:var(--ink); border-left:3px solid var(--gold);
+  }
+  .explain b{ color:var(--terracotta); }
+  .mechs{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+  .mech-tag{ font-size:11px; padding:3px 9px; border-radius:999px; background:var(--felt-light); color:var(--parchment); }
+  .fb-row{ display:flex; gap:8px; margin-top:12px; align-items:center; }
+  .fb-btn{
+    border:1.5px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; cursor:pointer;
+    font-size:13px; font-weight:600; color:var(--ink-soft); display:flex; align-items:center; gap:5px;
+  }
+  .fb-btn.up:hover{ border-color:#3f8f5c; color:#3f8f5c; }
+  .fb-btn.down:hover{ border-color:var(--terracotta); color:var(--terracotta); }
+  .fb-btn.voted-up{ background:#e9f6ee; border-color:#3f8f5c; color:#3f8f5c; }
+  .fb-btn.voted-down{ background:#fdecE5; border-color:var(--terracotta); color:var(--terracotta); }
+
+  .empty{ text-align:center; padding:30px 10px; color:var(--ink-soft); font-size:14px;}
+
+  .footer-note{
+    margin-top:26px; font-size:12px; color:rgba(244,236,217,0.55); text-align:center; line-height:1.6;
+  }
+  .footer-note a{color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <svg class="die" width="76" height="76" viewBox="0 0 76 76" fill="none">
+      <rect x="6" y="6" width="64" height="64" rx="14" fill="#FBF6EA" stroke="#D1A23C" stroke-width="2"/>
+      <circle cx="24" cy="24" r="5.2" fill="#C2542A"/>
+      <circle cx="52" cy="24" r="5.2" fill="#1B3A2E"/>
+      <circle cx="38" cy="38" r="5.2" fill="#C2542A"/>
+      <circle cx="24" cy="52" r="5.2" fill="#1B3A2E"/>
+      <circle cx="52" cy="52" r="5.2" fill="#C2542A"/>
+    </svg>
+    <div>
+      <span class="eyebrow">Motor de Recomendação Híbrido · Explicável</span>
+      <h1>GameMatch IA</h1>
+      <p>Diga quantos vão jogar, quanto tempo têm e o que gostam — a IA filtra o que é impossível, calcula compatibilidade com o resto e explica cada recomendação em português claro.</p>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div class="panel">
+    <h2><span class="num">1</span> Seus filtros</h2>
+    <div class="grid2">
+      <div>
+        <label class="field">Jogadores</label>
+        <input type="number" id="players" value="4" min="1" max="10">
+      </div>
+      <div>
+        <label class="field">Idade mínima do grupo</label>
+        <input type="number" id="age" value="10" min="3" max="18">
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <label class="field">Tempo máximo disponível: <span class="slider-val" id="timeVal">60 min</span></label>
+      <input type="range" id="time" min="10" max="180" step="5" value="60">
+    </div>
+    <div style="margin-top:18px;">
+      <label class="field">Complexidade desejada: <span class="slider-val" id="complexVal">3</span></label>
+      <input type="range" id="complexity" min="1" max="5" step="1" value="3">
+    </div>
+    <div style="margin-top:18px;">
+      <label class="field">Mecânicas preferidas (opcional)</label>
+      <div class="chips" id="mechChips"></div>
+    </div>
+    <div class="row-buttons">
+      <button class="primary" id="searchBtn">🎲 Encontrar meu jogo</button>
+      <button class="ghost" id="quickBtn">⚡ Jogo rápido (2 jog., ≤20 min)</button>
+      <button class="ghost" id="resetBtn">Limpar feedback aprendido</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="panel">
+    <h2><span class="num">2</span> Recomendações</h2>
+    <div class="result-meta">
+      <span id="resultStatus">Ajuste os filtros e clique em "Encontrar meu jogo".</span>
+      <span class="badge" id="modeBadge">cold start</span>
+    </div>
+    <div id="results"></div>
+  </div>
+
+  <div class="footer-note">
+    GameMatch IA · Protótipo demonstrativo do pipeline de IA (Filtro de Regras → Similaridade de Cosseno → Feedback Loop).<br>
+    Avaliações (👍/👎) ajustam os pesos do seu perfil em tempo real e ficam salvas no seu navegador.
+  </div>
+
+</div>
+
+<script>
+// ---------- DATASET (representativo, inspirado em catálogo público BGG) ----------
+const MECHANICS = ["Alocação de Trabalhadores","Construção de Baralho","Blefe","Cooperativo",
+  "Controle de Área","Rolagem de Dados","Dedução","Gerenciamento de Mão","Negociação",
+  "Engine Building","Tile Placement","Party/Palavras"];
+
+const GAMES = [
+  {name:"Catan", minP:3,maxP:4, time:90, age:10, complexity:2.3, rating:7.2, mechs:["Negociação","Tile Placement","Controle de Área"]},
+  {name:"Carcassonne", minP:2,maxP:5, time:40, age:7, complexity:1.9, rating:7.4, mechs:["Tile Placement","Controle de Área"]},
+  {name:"Codenames", minP:4,maxP:8, time:20, age:14, complexity:1.3, rating:7.6, mechs:["Party/Palavras","Dedução"]},
+  {name:"Azul", minP:2,maxP:4, time:40, age:8, complexity:1.8, rating:7.8, mechs:["Tile Placement"]},
+  {name:"Wingspan", minP:1,maxP:5, time:70, age:10, complexity:2.4, rating:8.1, mechs:["Engine Building","Gerenciamento de Mão"]},
+  {name:"Pandemic", minP:2,maxP:4, time:45, age:8, complexity:2.4, rating:7.6, mechs:["Cooperativo","Gerenciamento de Mão"]},
+  {name:"Ticket to Ride", minP:2,maxP:5, time:60, age:8, complexity:1.8, rating:7.4, mechs:["Controle de Área","Gerenciamento de Mão"]},
+  {name:"Splendor", minP:2,maxP:4, time:30, age:10, complexity:1.8, rating:7.4, mechs:["Engine Building","Gerenciamento de Mão"]},
+  {name:"7 Wonders", minP:3,maxP:7, time:30, age:10, complexity:2.3, rating:7.7, mechs:["Engine Building","Negociação"]},
+  {name:"Dixit", minP:3,maxP:6, time:30, age:8, complexity:1.2, rating:7.3, mechs:["Party/Palavras","Blefe"]},
+  {name:"Terraforming Mars", minP:1,maxP:5, time:120, age:12, complexity:3.2, rating:8.4, mechs:["Engine Building","Tile Placement"]},
+  {name:"Gloomhaven", minP:1,maxP:4, time:120, age:14, complexity:3.9, rating:8.6, mechs:["Cooperativo","Construção de Baralho"]},
+  {name:"Root", minP:2,maxP:4, time:90, age:10, complexity:3.1, rating:8.0, mechs:["Controle de Área","Engine Building"]},
+  {name:"Scythe", minP:1,maxP:5, time:115, age:14, complexity:3.4, rating:8.2, mechs:["Controle de Área","Engine Building"]},
+  {name:"Camel Up", minP:2,maxP:8, time:30, age:8, complexity:1.4, rating:7.2, mechs:["Rolagem de Dados","Negociação"]},
+  {name:"Sushi Go!", minP:2,maxP:5, time:15, age:8, complexity:1.0, rating:7.0, mechs:["Gerenciamento de Mão"]},
+  {name:"King of Tokyo", minP:2,maxP:6, time:30, age:8, complexity:1.5, rating:7.1, mechs:["Rolagem de Dados","Controle de Área"]},
+  {name:"Forbidden Island", minP:2,maxP:4, time:30, age:10, complexity:1.5, rating:6.6, mechs:["Cooperativo"]},
+  {name:"Patchwork", minP:2,maxP:2, time:20, age:8, complexity:1.6, rating:7.6, mechs:["Tile Placement"]},
+  {name:"Santorini", minP:2,maxP:4, time:20, age:8, complexity:1.7, rating:7.1, mechs:["Controle de Área"]},
+  {name:"Hanabi", minP:2,maxP:5, time:25, age:8, complexity:1.2, rating:7.2, mechs:["Cooperativo","Dedução"]},
+  {name:"Coup", minP:2,maxP:6, time:15, age:10, complexity:1.2, rating:7.4, mechs:["Blefe","Negociação"]},
+  {name:"Love Letter", minP:2,maxP:4, time:20, age:10, complexity:1.0, rating:7.2, mechs:["Dedução","Blefe"]},
+  {name:"Brass: Birmingham", minP:2,maxP:4, time:120, age:14, complexity:3.9, rating:8.6, mechs:["Engine Building","Negociação"]}
+];
+
+// ---------- STATE ----------
+let selectedMechs = new Set();
+let weights = {}; // mechanic -> multiplier, learned from feedback
+let votes = {};   // gameName -> 'up' | 'down'
+
+MECHANICS.forEach(m => weights[m] = 1.0);
+
+async function loadState(){
+  try{
+    const w = await window.storage.get('gamematch:weights');
+    if(w && w.value) weights = JSON.parse(w.value);
+  }catch(e){ /* no saved weights yet */ }
+  try{
+    const v = await window.storage.get('gamematch:votes');
+    if(v && v.value) votes = JSON.parse(v.value);
+  }catch(e){ /* no saved votes yet */ }
+}
+async function saveState(){
+  try{ await window.storage.set('gamematch:weights', JSON.stringify(weights)); }catch(e){}
+  try{ await window.storage.set('gamematch:votes', JSON.stringify(votes)); }catch(e){}
+}
+
+// ---------- UI: mechanic chips ----------
+const chipsEl = document.getElementById('mechChips');
+MECHANICS.forEach(m=>{
+  const c = document.createElement('div');
+  c.className='chip'; c.textContent=m;
+  c.onclick = ()=>{ c.classList.toggle('active'); selectedMechs.has(m)?selectedMechs.delete(m):selectedMechs.add(m); };
+  chipsEl.appendChild(c);
+});
+
+document.getElementById('time').oninput = e=>{ document.getElementById('timeVal').textContent = e.target.value+' min'; };
+document.getElementById('complexity').oninput = e=>{ document.getElementById('complexVal').textContent = e.target.value; };
+
+document.getElementById('quickBtn').onclick = ()=>{
+  document.getElementById('players').value=2;
+  document.getElementById('time').value=20;
+  document.getElementById('timeVal').textContent='20 min';
+  runSearch();
+};
+document.getElementById('resetBtn').onclick = async ()=>{
+  MECHANICS.forEach(m=>weights[m]=1.0);
+  votes = {};
+  await saveState();
+  document.getElementById('resultStatus').textContent = 'Feedback aprendido foi zerado.';
+};
+document.getElementById('searchBtn').onclick = runSearch;
+
+// ---------- IA PIPELINE ----------
+function ruleBasedFilter(players, maxTime, minAge){
+  return GAMES.filter(g => players>=g.minP && players<=g.maxP && g.time<=maxTime && minAge>=g.age);
+}
+
+function cosineSim(userVec, gameVec){
+  let dot=0, normU=0, normG=0;
+  for(const m of MECHANICS){
+    dot += userVec[m]*gameVec[m];
+    normU += userVec[m]*userVec[m];
+    normG += gameVec[m]*gameVec[m];
+  }
+  if(normU===0 || normG===0) return 0;
+  return dot/(Math.sqrt(normU)*Math.sqrt(normG));
+}
+
+function buildUserVector(){
+  const v = {};
+  MECHANICS.forEach(m=> v[m] = (selectedMechs.has(m) ? 1.0 : 0.15) * weights[m]);
+  return v;
+}
+function buildGameVector(game){
+  const v = {};
+  MECHANICS.forEach(m=> v[m] = game.mechs.includes(m) ? 1.0 : 0.0);
+  return v;
+}
+
+function runSearch(){
+  const players = parseInt(document.getElementById('players').value)||1;
+  const maxTime = parseInt(document.getElementById('time').value);
+  const minAge = parseInt(document.getElementById('age').value);
+  const desiredComplexity = parseFloat(document.getElementById('complexity').value);
+
+  const filtered = ruleBasedFilter(players, maxTime, minAge);
+  const statusEl = document.getElementById('resultStatus');
+  const modeBadge = document.getElementById('modeBadge');
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML='';
+
+  if(filtered.length===0){
+    statusEl.textContent = `Nenhum jogo passou no filtro de regras (CSP) para ${players} jogador(es), ≤${maxTime} min, idade ${minAge}+.`;
+    modeBadge.textContent='sem resultados';
+    resultsEl.innerHTML = '<div class="empty">Tente afrouxar os filtros — nenhuma combinação compatível foi encontrada no catálogo.</div>';
+    return;
+  }
+
+  const coldStart = selectedMechs.size===0;
+  modeBadge.textContent = coldStart ? 'cold start · nota BGG' : 'conteúdo + feedback';
+
+  const userVec = buildUserVector();
+
+  const scored = filtered.map(g=>{
+    const gameVec = buildGameVector(g);
+    const sim = coldStart ? (g.rating/10) : cosineSim(userVec, gameVec);
+    const complexityPenalty = 1 - Math.min(Math.abs(g.complexity-desiredComplexity)/4, 1);
+    const finalScore = coldStart
+        ? sim
+        : (0.75*sim + 0.25*complexityPenalty);
+    return {...g, score: finalScore};
+  }).sort((a,b)=>b.score-a.score).slice(0,5);
+
+  statusEl.textContent = `${filtered.length} jogo(s) passaram no filtro de regras · top ${scored.length} por compatibilidade.`;
+
+  scored.forEach(g=>{
+    const pct = Math.round(g.score*100);
+    const matched = g.mechs.filter(m=>selectedMechs.has(m));
+    const card = document.createElement('div');
+    card.className='game-card';
+
+    let explainText;
+    if(coldStart){
+      explainText = `Recomendado por <b>nota média da comunidade BGG (${g.rating}/10)</b>, já que você ainda não indicou mecânicas preferidas (cenário de cold start). Atende a todos os filtros obrigatórios: ${players} jogador(es), até ${maxTime} min, idade mínima ${g.age}.`;
+    } else if(matched.length>0){
+      explainText = `Recomendado porque combina <b>${pct}%</b> com seu perfil — você marcou ${matched.map(m=>'<b>'+m+'</b>').join(', ')}, presente(s) neste jogo — e atende aos filtros de jogadores, tempo e idade.`;
+    } else {
+      explainText = `Passou em todos os filtros obrigatórios e teve <b>${pct}%</b> de compatibilidade vetorial com seu perfil, mesmo sem mecânicas em comum diretas — o motor considerou também a complexidade desejada (${desiredComplexity}/5 vs. ${g.complexity}/5 do jogo).`;
+    }
+
+    const voteState = votes[g.name];
+    card.innerHTML = `
+      <div class="game-head">
+        <div>
+          <p class="game-title">${g.name}</p>
+          <p class="game-sub">${g.minP}-${g.maxP} jogadores · ${g.time} min · ${g.age}+ · complexidade ${g.complexity}/5</p>
+        </div>
+        <div class="score">${pct}%<small>compatibilidade</small></div>
+      </div>
+      <div class="explain">${explainText}</div>
+      <div class="mechs">${g.mechs.map(m=>`<span class="mech-tag">${m}</span>`).join('')}</div>
+      <div class="fb-row">
+        <button class="fb-btn up ${voteState==='up'?'voted-up':''}" data-game="${g.name}" data-vote="up">👍 Gostei</button>
+        <button class="fb-btn down ${voteState==='down'?'voted-down':''}" data-game="${g.name}" data-vote="down">👎 Não curti</button>
+      </div>
+    `;
+    resultsEl.appendChild(card);
+  });
+
+  document.querySelectorAll('.fb-btn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const gameName = btn.dataset.game;
+      const voteType = btn.dataset.vote;
+      const game = GAMES.find(x=>x.name===gameName);
+      const delta = voteType==='up' ? 0.12 : -0.12;
+      game.mechs.forEach(m=>{
+        weights[m] = Math.min(2.0, Math.max(0.2, weights[m]+delta));
+      });
+      votes[gameName] = voteType;
+      await saveState();
+      runSearch();
+    };
+  });
+}
+
+// ---------- INIT ----------
+(async ()=>{
+  await loadState();
+})();
+</script>
+</body>
+</html>
